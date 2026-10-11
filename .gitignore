@@ -1,0 +1,46 @@
+# Build outputs
+bin/
+obj/
+out/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider / JetBrains
+.idea/
+
+# VS Code
+.vscode/
+
+# Installer output
+installer/Output/
+
+# .NET
+*.nupkg
+*.snupkg
+project.lock.json
+.dotnet/
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# SDD workspace
+.superpowers/
+
+# Test results
+TestResults/
+coverage/
+*.trx
+*.coverage
+
+# Claude Code local state
+.claude/
+CLAUDE.md
+
+# Local publish output
+publish/

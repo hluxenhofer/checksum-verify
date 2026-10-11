@@ -1,0 +1,90 @@
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 1.2.0)'
+        required: true
+        type: string
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history so the tag push works and links resolve correctly
+          fetch-depth: 0
+          # PAT required — GITHUB_TOKEN push does not trigger release.yml
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Validate version format
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Version must be in MAJOR.MINOR.PATCH format (e.g. 1.2.0)"
+            exit 1
+          fi
+
+      - name: Check [Unreleased] has content
+        run: |
+          # Fail fast if there is nothing between [Unreleased] and the next ## section
+          content=$(awk '/^## \[Unreleased\]/{found=1; next} found && /^## \[/{exit} found && NF{print}' CHANGELOG.md)
+          if [ -z "$content" ]; then
+            echo "::error::[Unreleased] section is empty — add changelog entries before releasing."
+            exit 1
+          fi
+
+      - name: Promote [Unreleased] → [${{ inputs.version }}]
+        env:
+          VERSION: ${{ inputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Strip CRLFs so sed anchors work regardless of checkout line endings
+          sed -i 's/\r//' CHANGELOG.md
+
+          version="$VERSION"
+          today=$(date -u +%Y-%m-%d)
+          repo="https://github.com/$REPO"
+
+          # Insert the versioned header after [Unreleased] (keep the empty Unreleased for next cycle)
+          sed -i "s|^## \[Unreleased\]$|## [Unreleased]\n\n## [${version}] - ${today}|" CHANGELOG.md
+
+          # Find the most recent existing tag (if any) to build the correct comparison link
+          prev_tag=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          if [ -n "$prev_tag" ]; then
+            version_link="${repo}/compare/${prev_tag}...v${version}"
+          else
+            version_link="${repo}/releases/tag/v${version}"
+          fi
+
+          # Update the reference links at the bottom
+          sed -i "s|^\[Unreleased\]:.*|[Unreleased]: ${repo}/compare/v${version}...HEAD\n[${version}]: ${version_link}|" CHANGELOG.md
+
+      - name: Bump version in Directory.Build.props
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          sed -i "s|<Version>.*</Version>|<Version>${VERSION}</Version>|" Directory.Build.props
+
+      - name: Commit and tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md Directory.Build.props
+          git commit -m "chore(release): v${VERSION}"
+          git tag "v${VERSION}"
+          git push origin HEAD:main
+          git push origin "v${VERSION}"

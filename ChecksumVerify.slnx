@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ChecksumVerify.Core/ChecksumVerify.Core.csproj" />
+    <Project Path="src/ChecksumVerify/ChecksumVerify.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ChecksumVerify.Tests/ChecksumVerify.Tests.csproj" />
+  </Folder>
+</Solution>

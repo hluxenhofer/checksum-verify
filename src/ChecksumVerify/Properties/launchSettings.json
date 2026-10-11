@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ChecksumVerify": {
+      "commandName": "Project",
+      "commandLineArgs": "\"$(UserProfile)\\Downloads\\example.zip\""
+    }
+  }
+}

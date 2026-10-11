@@ -1,0 +1,62 @@
+name: Bug Report
+description: Something isn't working correctly
+labels: ["bug"]
+body:
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this has not been reported yet
+          required: true
+        - label: This is not a security vulnerability (those go through the private advisory link)
+          required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Windows version
+      options:
+        - Windows 11
+        - Windows 10
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: ChecksumVerify version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: algorithm
+    attributes:
+      label: Algorithm involved
+      options:
+        - Not algorithm-specific
+        - SHA-256
+        - SHA-512
+        - SHA3-256
+        - SHA3-512
+        - BLAKE3
+        - BLAKE2b-256
+        - BLAKE2b-512
+        - MD5
+        - SHA-1
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Steps to reproduce and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: input
+    attributes:
+      label: Hash file or hash string (if relevant)
+      description: Paste the hash file contents or the hash you entered. Do not include private data.
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or additional context
+      description: Drag and drop images here.

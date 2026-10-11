@@ -1,0 +1,115 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.x'
+
+      - name: Extract version
+        id: version
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if ! echo "$version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Tag must be vMAJOR.MINOR.PATCH"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Test
+        run: dotnet test -c Release
+
+      - name: Publish self-contained
+        run: >
+          dotnet publish src/ChecksumVerify/ChecksumVerify.csproj
+          -c Release -r win-x64 --self-contained
+          -o publish/win-x64/
+
+      - name: Verify resources.pri was published
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "publish/win-x64/resources.pri")) {
+            Write-Error "resources.pri missing from publish output — installed app will fail to load XAML"
+            exit 1
+          }
+          Write-Host "resources.pri OK"
+
+      # TODO: Add SignPath Foundation signing step here
+      # See: https://signpath.io/solutions/open-source-community
+
+      - name: Install Inno Setup 7
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $asset = gh api repos/jrsoftware/issrc/releases/tags/is-7_1_0 `
+            --jq '.assets[] | select(.name == "innosetup-7.1.0-x64.exe") | {url: .browser_download_url, digest: .digest}' `
+            | ConvertFrom-Json
+          $installer = "$env:TEMP\innosetup-7.1.0-x64.exe"
+          Invoke-WebRequest -Uri $asset.url -OutFile $installer
+          $expected = $asset.digest -replace '^sha256:', ''
+          $actual = (Get-FileHash -Algorithm SHA256 $installer).Hash.ToLower()
+          if ($actual -ne $expected.ToLower()) {
+            Write-Error "SHA256 mismatch: expected $expected but got $actual"
+            exit 1
+          }
+          Start-Process -Wait -FilePath $installer -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-"
+          echo "C:\Program Files (x86)\Inno Setup 7" >> $env:GITHUB_PATH
+
+      - name: Build installer
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: iscc installer\setup.iss /DAppVersion=$env:VERSION
+
+      - name: Generate SHA256SUMS
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $version = $env:VERSION
+          Set-Location installer/Output
+          $name = "ChecksumVerify-$version-Setup.exe"
+          $hash = (Get-FileHash -Algorithm SHA256 $name).Hash.ToLower()
+          Set-Content -Encoding ascii -Path SHA256SUMS -Value "$hash  $name"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: installer/Output/ChecksumVerify-${{ steps.version.outputs.version }}-Setup.exe
+
+      - name: Extract changelog notes
+        id: changelog
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          version="$VERSION"
+          notes=$(awk "/^## \[$version\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+          {
+            echo "notes<<CHANGELOG_NOTES_EOF"
+            echo "$notes"
+            echo "CHANGELOG_NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          files: |
+            installer/Output/ChecksumVerify-${{ steps.version.outputs.version }}-Setup.exe
+            installer/Output/SHA256SUMS
+          body: ${{ steps.changelog.outputs.notes }}
