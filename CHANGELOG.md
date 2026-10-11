@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-11
+
 ### Added
 
 - Right-click context menu integration for all files via "Show more options" → "Verify Checksum"
@@ -31,4 +33,5 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CodeQL, dependency review and OpenSSF Scorecard workflows; `SUPPORT.md`
 - Open source project files: contributing guide, code of conduct, security policy, third-party notices
 
-[Unreleased]: https://github.com/hluxenhofer/checksum-verify/commits/main
+[Unreleased]: https://github.com/hluxenhofer/checksum-verify/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/hluxenhofer/checksum-verify/releases/tag/v0.1.0
