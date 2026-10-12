@@ -15,18 +15,35 @@ public static class HashEngine
         _ => true
     };
 
+    /// <summary>Length of the hex digest in characters.</summary>
+    public static int HexLength(HashAlgorithmId algorithm) => algorithm switch
+    {
+        HashAlgorithmId.Md5 => 32,
+        HashAlgorithmId.Sha1 => 40,
+        HashAlgorithmId.Sha256 or HashAlgorithmId.Sha3_256 or HashAlgorithmId.Blake3 or HashAlgorithmId.Blake2b_256 => 64,
+        HashAlgorithmId.Sha512 or HashAlgorithmId.Sha3_512 or HashAlgorithmId.Blake2b_512 => 128,
+        _ => throw new ArgumentOutOfRangeException(nameof(algorithm))
+    };
+
+    /// <summary>Supported algorithms that produce a digest of the given hex length.</summary>
+    public static IReadOnlyList<HashAlgorithmId> CandidatesForHexLength(int hexLength) =>
+        Enum.GetValues<HashAlgorithmId>()
+            .Where(a => HexLength(a) == hexLength && IsSupported(a))
+            .ToArray();
+
     public static async Task<string> ComputeAsync(
         string filePath,
         HashAlgorithmId algorithm,
         IProgress<long>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        // bufferSize 0: we read in our own 64 KB chunks, so FileStream's buffer would only add a copy
         await using var stream = new FileStream(
             filePath,
             FileMode.Open,
             FileAccess.Read,
-            FileShare.Read,
-            bufferSize: BufferSize,
+            FileShare.ReadWrite | FileShare.Delete,
+            bufferSize: 0,
             useAsync: true);
 
         return algorithm switch
@@ -47,6 +64,28 @@ public static class HashEngine
     public static bool Verify(string computed, string expected) =>
         string.Equals(computed.Trim(), expected.Trim(), StringComparison.OrdinalIgnoreCase);
 
+    // Reports progress about once per MiB (and once at the end) instead of once per chunk:
+    // a 10 GB file would otherwise post ~160,000 UI updates.
+    private const int ChunksPerProgressReport = 16;
+
+    private static async Task ReadChunksAsync(
+        Stream stream,
+        Action<byte[], int> consume,
+        IProgress<long>? progress,
+        CancellationToken cancellationToken)
+    {
+        byte[] buffer = new byte[BufferSize];
+        int bytesRead;
+        int chunks = 0;
+        while ((bytesRead = await stream.ReadAsync(buffer, cancellationToken)) > 0)
+        {
+            consume(buffer, bytesRead);
+            if (++chunks % ChunksPerProgressReport == 0)
+                progress?.Report(stream.Position);
+        }
+        progress?.Report(stream.Position);
+    }
+
     private static async Task<string> ComputeIncrementalAsync(
         HashAlgorithm hasher,
         Stream stream,
@@ -55,13 +94,7 @@ public static class HashEngine
     {
         using (hasher)
         {
-            byte[] buffer = new byte[BufferSize];
-            int bytesRead;
-            while ((bytesRead = await stream.ReadAsync(buffer, cancellationToken)) > 0)
-            {
-                hasher.TransformBlock(buffer, 0, bytesRead, null, 0);
-                progress?.Report(stream.Position);
-            }
+            await ReadChunksAsync(stream, (buffer, count) => hasher.TransformBlock(buffer, 0, count, null, 0), progress, cancellationToken);
             hasher.TransformFinalBlock([], 0, 0);
             return Convert.ToHexString(hasher.Hash!).ToLowerInvariant();
         }
@@ -73,13 +106,7 @@ public static class HashEngine
         CancellationToken cancellationToken)
     {
         using var hasher = Hasher.New();
-        byte[] buffer = new byte[BufferSize];
-        int bytesRead;
-        while ((bytesRead = await stream.ReadAsync(buffer, cancellationToken)) > 0)
-        {
-            hasher.Update(buffer.AsSpan(0, bytesRead));
-            progress?.Report(stream.Position);
-        }
+        await ReadChunksAsync(stream, (buffer, count) => hasher.Update(buffer.AsSpan(0, count)), progress, cancellationToken);
         return hasher.Finalize().ToString();
     }
 
@@ -90,13 +117,7 @@ public static class HashEngine
         CancellationToken cancellationToken)
     {
         var hasher = Blake2b.CreateIncrementalHasher(outputBytes);
-        byte[] buffer = new byte[BufferSize];
-        int bytesRead;
-        while ((bytesRead = await stream.ReadAsync(buffer, cancellationToken)) > 0)
-        {
-            hasher.Update(buffer.AsSpan(0, bytesRead));
-            progress?.Report(stream.Position);
-        }
+        await ReadChunksAsync(stream, (buffer, count) => hasher.Update(buffer.AsSpan(0, count)), progress, cancellationToken);
         byte[] result = new byte[outputBytes];
         hasher.Finish(result.AsSpan());
         return Convert.ToHexString(result).ToLowerInvariant();

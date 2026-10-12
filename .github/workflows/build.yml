@@ -59,10 +59,14 @@ jobs:
           -c Release -r win-x64 --self-contained
           -o publish/win-x64/
 
-      - name: Verify resources.pri was published
+      - name: Verify publish output is complete
         shell: pwsh
         run: |
-          if (-not (Test-Path "publish/win-x64/resources.pri")) {
-            Write-Error "resources.pri missing from publish output"
-            exit 1
+          # resources.pri: XAML resource lookup; Microsoft.WinUI.dll: the self-contained Windows App SDK runtime
+          foreach ($file in "resources.pri", "Microsoft.WinUI.dll") {
+            if (-not (Test-Path "publish/win-x64/$file")) {
+              Write-Error "$file missing from publish output — installed app will fail to start"
+              exit 1
+            }
           }
+          Write-Host "Publish output OK"

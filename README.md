@@ -84,10 +84,10 @@ Instead of pasting, pick a `.sha256`, `.b3`, … sidecar or a GNU coreutils chec
 | Requirement | Minimum |
 |---|---|
 | Windows | Windows 10 22H2 or Windows 11 |
-| SHA3 algorithms | Windows 11 22H2+ only (CNG requirement) |
+| SHA3 algorithms | Windows 11 24H2+ only (OS cryptography requirement) |
 | Architecture | x64 (ARM64 builds are not published yet) |
 
-SHA3-256 and SHA3-512 options are automatically grayed out with an explanatory tooltip on Windows 10.
+SHA3-256 and SHA3-512 options are automatically grayed out, with an explanatory tooltip, on Windows 10 and on Windows 11 before 24H2.
 
 ---
 
@@ -97,15 +97,15 @@ SHA3-256 and SHA3-512 options are automatically grayed out with an explanatory t
 |---|---|---|
 | SHA-256 | 64 chars | Default; auto-detected from clipboard |
 | SHA-512 | 128 chars | Auto-detected from clipboard |
-| SHA3-256 | 64 chars | Windows 11 22H2+ only |
-| SHA3-512 | 128 chars | Windows 11 22H2+ only |
+| SHA3-256 | 64 chars | Windows 11 24H2+ only |
+| SHA3-512 | 128 chars | Windows 11 24H2+ only |
 | BLAKE3 | 64 chars | |
 | BLAKE2b-256 | 64 chars | |
 | BLAKE2b-512 | 128 chars | |
 | MD5 | 32 chars | Legacy; auto-detected |
 | SHA-1 | 40 chars | Legacy; auto-detected |
 
-When clipboard content is ambiguous (e.g., 64 hex chars could be SHA-256, SHA3-256, BLAKE3, or BLAKE2b-256), the dropdown defaults to SHA-256 and shows a disambiguation note.
+When clipboard content is ambiguous (e.g., 64 hex chars could be SHA-256, SHA3-256, BLAKE3, or BLAKE2b-256), the dropdown defaults to SHA-256 (keeping an algorithm you picked yourself) and shows a note listing the candidates.
 
 ---
 
@@ -125,7 +125,7 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 *empty.bin
 | `.sha512` | SHA-512 |
 | `.sha3-256` | SHA3-256 |
 | `.sha3-512` | SHA3-512 |
-| `.b2`, `.blake2`, `.blake2b` | BLAKE2b |
+| `.b2`, `.blake2`, `.blake2b` | BLAKE2b (512-bit; 256-bit for 64-character hashes) |
 | `.b3`, `.blake3` | BLAKE3 |
 | `.md5` | MD5 |
 | `.sha1` | SHA-1 |
@@ -137,7 +137,7 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 *empty.bin
 
 - **No "Verify Checksum" entry on Windows 11** — it lives under **Show more options** (or press `Shift+F10`) in the classic context menu.
 - **SmartScreen warning** — see [Unsigned installer notice](#unsigned-installer-notice).
-- **SHA3 options are grayed out** — SHA3 needs Windows 11 22H2+ (see [Requirements](#requirements)).
+- **SHA3 options are grayed out** — SHA3 needs Windows 11 24H2+ (see [Requirements](#requirements)).
 - **Anything else** — [open an issue](https://github.com/hluxenhofer/checksum-verify/issues/new/choose) or see [SUPPORT.md](SUPPORT.md).
 
 ---
