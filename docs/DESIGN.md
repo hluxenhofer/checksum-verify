@@ -69,7 +69,7 @@ Registry shell verb (HKLM)
 | Runtime | .NET 10 LTS | stable (Nov 2025) |
 | UI | Windows App SDK / WinUI 3 (unpackaged) | 2.5.1 |
 | Windows App SDK runtime | Self-contained — bundled next to the exe by `WindowsAppSDKSelfContained` when publishing with a runtime identifier | — |
-| Window backdrop | Mica (Win 11) / Acrylic (Win 10) | via `MicaController` / `DesktopAcrylicBackdrop` |
+| Window backdrop | Mica (Win 11) / Acrylic (Win 10) | via `MicaBackdrop` / `DesktopAcrylicBackdrop` |
 | SHA-256, SHA-512 | `System.Security.Cryptography` | BCL |
 | SHA3-256, SHA3-512 | `System.Security.Cryptography.SHA3_256/512` | BCL (.NET 10) |
 | BLAKE3 | `Blake3` (xoofx/Blake3.NET) | 3.0.2 |
@@ -121,7 +121,7 @@ Auto-detection sets the algorithm dropdown when the user pastes or types a hash.
 │                                                    │
 │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ (progress, hidden)  │
 │                                                    │
-│                    [Cancel]  [Verify ▶]            │
+│                    [Cancel]  [Verify]              │
 └────────────────────────────────────────────────────┘
 ```
 
@@ -145,7 +145,7 @@ A progress bar fills as bytes are read (file-size maximum; updated about once pe
 │ │ ✓ Checksum verified — the file matches the   │  │
 │ │   expected hash.                             │  │
 │ └──────────────────────────────────────────────┘  │
-│                              [Close]  [Verify ▶]  │
+│                              [Close]  [Verify]    │
 └────────────────────────────────────────────────────┘
 ```
 
@@ -163,7 +163,7 @@ A progress bar fills as bytes are read (file-size maximum; updated about once pe
 │ │ Computed hash — copied to clipboard          │  │
 │ │ [80ce3ecd...a37c15ff              ]          │  │
 │ └──────────────────────────────────────────────┘  │
-│       [Copy hash]          [Close]  [Verify ▶]    │
+│                [Copy hash]  [Close]  [Verify]     │
 └────────────────────────────────────────────────────┘
 ```
 
@@ -327,7 +327,7 @@ iscc installer\setup.iss
 - **Unit tests** (`ChecksumVerify.Tests`): `HashEngine`, `HashFileParser`, `ClipboardDetector`, `AlgorithmSelector`, `VerifyInputResolver` — no UI; they read small fixture or temp files but need no mocks. The window's decisions (auto-selection, validation, error text) are pure Core functions, so only control wiring, DPI sizing and window placement need manual testing
 - **Known-hash fixtures**: small test files with pre-computed hashes committed to `tests/ChecksumVerify.Tests/Fixtures/`. SHA3 tests skip themselves where the OS lacks SHA-3 support
 - **Manual UI tests**: developer runs against real downloaded files before each release
-- **CI**: `dotnet test` on every push; `dotnet build -c Release` as gate for PRs
+- **CI** (`build.yml`, on push to `main` and on PRs): Release build, `dotnet test`, and a self-contained publish smoke test that checks `resources.pri` and `Microsoft.WinUI.dll` are in the output
 
 No mocking of the hash libraries — tests use real algorithm implementations against known inputs.
 

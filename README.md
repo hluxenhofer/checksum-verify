@@ -117,6 +117,8 @@ When clipboard content is ambiguous (e.g., 64 hex chars could be SHA-256, SHA3-2
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 *empty.bin
 ```
 
+Also supported: BSD-style lines from `sha256sum --tag` (`SHA256 (hello.bin) = <hash>`, the tag selects the algorithm), backslash-escaped file names, and `#` comment lines. The entry is found by file name.
+
 **Sidecar files** — ChecksumVerify auto-selects the algorithm from the extension:
 
 | Extension | Algorithm |
@@ -160,6 +162,7 @@ dotnet run --project src/ChecksumVerify -- "C:\path\to\file.zip"
 dotnet test
 
 # Build installer (requires Inno Setup 7)
+dotnet publish src/ChecksumVerify/ChecksumVerify.csproj -c Release -r win-x64 --self-contained -o publish/win-x64/
 iscc installer\setup.iss
 ```
 
