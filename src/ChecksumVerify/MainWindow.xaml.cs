@@ -12,16 +12,17 @@ namespace ChecksumVerify;
 
 public sealed partial class MainWindow : Window
 {
-    // Client-area size in device-independent pixels (scaled by the monitor DPI before use)
+    // Client-area width in device-independent pixels (scaled by the monitor DPI before use).
+    // The height is not fixed: the window is sized to its content (see FitToContent).
     private const int WindowWidth = 520;
-    private const int InputHeight = 400;
-    private const int ResultHeight = 460;
-    private const int ResultWithHashHeight = 560;
+    // Only until the first layout pass can measure the real content
+    private const int InitialHeight = 400;
 
     private readonly string _filePath;
     private CancellationTokenSource? _cts;
     private string? _hashFilePath;
     private bool _isComputing;
+    private RectInt32 _initialWorkArea;
 
     // The algorithm the user picked by hand; auto-detection never overrides it while the hash length fits
     private HashAlgorithmId? _userChoice;
@@ -77,6 +78,14 @@ public sealed partial class MainWindow : Window
         PositionOnActiveMonitor();
         Closed += (_, _) => _cts?.Cancel();
 
+        // Templates (ComboBox, TextBox, ...) only exist once the tree is live, so the real
+        // content height can be measured only now. Size to it and re-center once.
+        ((FrameworkElement)Content).Loaded += (_, _) =>
+        {
+            FitToContent();
+            CenterInInitialWorkArea();
+        };
+
         _ = FillFromClipboardAsync();
     }
 
@@ -101,14 +110,27 @@ public sealed partial class MainWindow : Window
         var display = NativeMethods.GetCursorPos(out var cursor)
             ? DisplayArea.GetFromPoint(new PointInt32(cursor.X, cursor.Y), DisplayAreaFallback.Nearest)
             : DisplayArea.Primary;
-        var work = display.WorkArea;
+        _initialWorkArea = display.WorkArea;
 
         // Move first so the DPI of the target monitor applies to the resize below
-        AppWindow.Move(new PointInt32(work.X, work.Y));
-        ResizeClient(WindowWidth, InputHeight);
+        AppWindow.Move(new PointInt32(_initialWorkArea.X, _initialWorkArea.Y));
+        ResizeClient(WindowWidth, InitialHeight);
+        CenterInInitialWorkArea();
+    }
+
+    private void CenterInInitialWorkArea() =>
         AppWindow.Move(new PointInt32(
-            work.X + (work.Width - AppWindow.Size.Width) / 2,
-            work.Y + (work.Height - AppWindow.Size.Height) / 2));
+            _initialWorkArea.X + (_initialWorkArea.Width - AppWindow.Size.Width) / 2,
+            _initialWorkArea.Y + (_initialWorkArea.Height - AppWindow.Size.Height) / 2));
+
+    // Sizes the window to what the content needs at the fixed width, so nothing is clipped
+    // at any DPI, text scale or error-message length, and there is no dead space.
+    // Call after anything that changes the content's height.
+    private void FitToContent()
+    {
+        if (Content is not FrameworkElement root || root.XamlRoot is null) return;
+        root.Measure(new Windows.Foundation.Size(WindowWidth, double.PositiveInfinity));
+        ResizeClient(WindowWidth, (int)Math.Ceiling(root.DesiredSize.Height));
     }
 
     // Growing for a result must not push the buttons off the bottom of the screen
@@ -177,6 +199,7 @@ public sealed partial class MainWindow : Window
             : null;
         AmbiguityNote.Text = note ?? string.Empty;
         AmbiguityNote.Visibility = note is null ? Visibility.Collapsed : Visibility.Visible;
+        FitToContent();
     }
 
     // ── Input handlers ────────────────────────────────────────────────────────
@@ -186,7 +209,7 @@ public sealed partial class MainWindow : Window
         var isHash = HashModeRadio.IsChecked == true;
         HashPanel.Visibility = isHash ? Visibility.Visible   : Visibility.Collapsed;
         FilePanel.Visibility = isHash ? Visibility.Collapsed : Visibility.Visible;
-        UpdateAmbiguityNote();
+        UpdateAmbiguityNote(); // also refits the window
         InvalidateResult();
     }
 
@@ -286,6 +309,7 @@ public sealed partial class MainWindow : Window
         CancelButton.Content = "Cancel";
         ComputeProgress.Value = 0;
         ComputeProgress.Visibility = Visibility.Visible;
+        FitToContent();
 
         try
         {
@@ -314,6 +338,7 @@ public sealed partial class MainWindow : Window
         {
             _isComputing = false;
             ComputeProgress.Visibility = Visibility.Collapsed;
+            FitToContent();
             VerifyButton.IsEnabled = true;
             CancelButton.Content = "Close";
             _cts?.Dispose();
@@ -334,7 +359,7 @@ public sealed partial class MainWindow : Window
         ResultBorder.Visibility  = Visibility.Visible;
         CancelButton.Content     = "Close";
 
-        ResizeClient(WindowWidth, showHash ? ResultWithHashHeight : ResultHeight);
+        FitToContent();
     }
 
     // Called at the start of a new verify run — hides elements, no resize.
@@ -350,7 +375,7 @@ public sealed partial class MainWindow : Window
     {
         if (ResultBorder.Visibility != Visibility.Visible) return;
         HideResultElements();
-        ResizeClient(WindowWidth, InputHeight);
+        FitToContent();
     }
 
     private void OnCopyHash(object sender, RoutedEventArgs e) =>

@@ -13,7 +13,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Hash-file problems (no entry for the file, no hash entered, hash length not matching the algorithm) are reported before hashing starts instead of after reading the whole file
 - Algorithm from a hash file is now applied (including `.sha256sum`/`.sha512sum`) instead of using whatever the dropdown showed
 - A sidecar file containing a line for a different file is no longer used as if it were the hash for this file
-- Window size is scaled by the display DPI, so content is no longer clipped at 125–200% scaling; the window stays inside the work area when it grows to show a result
+- Window is sized to its content at the display DPI instead of using fixed heights, so nothing is clipped at 125–200% scaling or with long messages, and there is no dead space; it stays inside the work area when it grows to show a result
 - Window opens on the monitor under the cursor instead of always the primary one
 - Clipboard auto-fill ignores hex strings that cannot be a hash (e.g. `2026`, `deadbeef`)
 - Auto-detection no longer overrides an algorithm you picked when the hash length still fits it

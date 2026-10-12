@@ -125,7 +125,7 @@ Auto-detection sets the algorithm dropdown when the user pastes or types a hash.
 └────────────────────────────────────────────────────┘
 ```
 
-- Always-on-top, 520 DIP wide client area (scaled by the monitor DPI), centered on the monitor under the cursor, Mica/Acrylic backdrop
+- Always-on-top, 520 DIP wide client area (scaled by the monitor DPI), centered on the monitor under the cursor, Mica/Acrylic backdrop. The height is not fixed: the window is measured and resized to its content whenever it changes (note shown, result shown, progress bar shown), and kept inside the work area, so nothing is clipped at any DPI or text scale
 - If the clipboard contains a plausible hash on open (hex string of 32/40/64/128 characters, or an `algo:`-prefixed one) → pre-fill hash field, select "Enter hash" mode, auto-select algorithm
 - SHA3 options are disabled on Windows versions without SHA-3 (Windows 10, Windows 11 before 24H2); the label names the requirement and a tooltip explains it
 - Inputs are validated **before** the file is read (empty or non-hex hash, hash length not matching the algorithm, no hash file selected, no entry for the file in the hash file), so errors appear immediately even for multi-GB files
@@ -225,34 +225,40 @@ Appears under "Show more options" on Windows 11 (legacy expanded menu). Top-leve
 
 ```
 checksum-verify/
-├── Directory.Packages.props       # Central Package Management — all NuGet versions here
 ├── .github/
 │   ├── workflows/
-│   │   ├── build.yml             # CI: build + test + publish smoke test on push/PR
-│   │   ├── release-prep.yml      # Manual: promote changelog, bump version, tag
-│   │   ├── release.yml           # Release: publish installer + SHA256SUMS
-│   │   └── codeql.yml, dependency-review.yml, scorecard.yml   # Security scanning
+│   │   ├── build.yml              # CI: build + test + publish smoke test on push/PR
+│   │   ├── release-prep.yml       # Manual: promote changelog, bump version, tag
+│   │   ├── release.yml            # Release: publish installer + SHA256SUMS
+│   │   ├── codeql.yml             # Code scanning
+│   │   ├── dependency-review.yml  # Dependency review on PRs
+│   │   └── scorecard.yml          # OpenSSF Scorecard
 │   ├── ISSUE_TEMPLATE/
 │   │   ├── bug_report.yml
-│   │   └── feature_request.yml
+│   │   ├── feature_request.yml
+│   │   └── config.yml
+│   ├── CODEOWNERS
+│   ├── dependabot.yml
 │   └── PULL_REQUEST_TEMPLATE.md
 ├── src/
 │   ├── ChecksumVerify.Core/
 │   │   ├── ChecksumVerify.Core.csproj
-│   │   ├── HashAlgorithmId.cs     # Enum of supported algorithms
-│   │   ├── HashEngine.cs          # Algorithm dispatch + streaming compute
-│   │   ├── HashFileParser.cs      # GNU + sidecar format parsing
-│   │   ├── ClipboardDetector.cs   # Hex string detection + length→algorithm
-│   │   ├── AlgorithmSelector.cs   # Dropdown auto-selection rules + ambiguity note
-│   │   ├── VerifyInputResolver.cs # Pre-hash input validation
-│   │   └── HashAlgorithmNames.cs  # Display names
+│   │   ├── HashAlgorithmId.cs      # Enum of supported algorithms
+│   │   ├── HashAlgorithmNames.cs   # Display names, SHA3 OS requirement text
+│   │   ├── HashEngine.cs           # Algorithm dispatch + streaming compute
+│   │   ├── HashFileParser.cs       # GNU, BSD and sidecar format parsing
+│   │   ├── ClipboardDetector.cs    # Hex string detection + length→algorithm
+│   │   ├── AlgorithmSelector.cs    # Dropdown auto-selection rules + ambiguity note
+│   │   └── VerifyInputResolver.cs  # Pre-hash input validation
 │   └── ChecksumVerify/
 │       ├── ChecksumVerify.csproj
-│       ├── Program.cs             # Custom Main (unpackaged WinUI 3 startup)
+│       ├── Program.cs              # Custom Main (unpackaged WinUI 3 startup)
 │       ├── App.xaml / App.xaml.cs
 │       ├── MainWindow.xaml / MainWindow.xaml.cs
-│       ├── NativeMethods.cs       # GetDpiForWindow / GetCursorPos
-│       ├── app.manifest           # Per-monitor DPI v2
+│       ├── NativeMethods.cs        # GetDpiForWindow / GetCursorPos
+│       ├── app.manifest            # Per-monitor DPI v2
+│       ├── Properties/
+│       │   └── launchSettings.json # `dotnet run` / debugger arguments
 │       └── Assets/
 │           └── checksumverify.ico
 ├── tests/
@@ -263,22 +269,29 @@ checksum-verify/
 │       ├── ClipboardDetectorTests.cs
 │       ├── AlgorithmSelectorTests.cs
 │       ├── VerifyInputResolverTests.cs
-│       └── Fixtures/              # Small files with known hashes
+│       └── Fixtures/               # Small files with known hashes
 ├── installer/
-│   └── setup.iss
+│   └── setup.iss                   # Inno Setup 7 script (context menu + uninstaller)
 ├── docs/
-│   └── DESIGN.md
+│   ├── DESIGN.md
+│   └── assets/                     # README demo GIFs
+├── Directory.Packages.props        # Central Package Management — all NuGet versions here
+├── Directory.Build.props           # Shared MSBuild properties (target framework, version)
+├── global.json                     # Pins .NET 10 SDK, selects the Microsoft.Testing.Platform runner
+├── ChecksumVerify.slnx
 ├── .editorconfig
 ├── .gitattributes
 ├── .gitignore
-├── global.json                    # Pins .NET 10
-├── Directory.Build.props          # Shared MSBuild properties
-├── ChecksumVerify.slnx
-├── CLAUDE.md
 ├── README.md
-├── LICENSE                        # MIT
 ├── CHANGELOG.md
-└── dev-setup.ps1                  # One-time developer machine setup
+├── CONTRIBUTING.md
+├── CODE_OF_CONDUCT.md
+├── SECURITY.md
+├── SUPPORT.md
+├── THIRD-PARTY-NOTICES.md          # Licenses of bundled dependencies (shipped with the installer)
+├── LICENSE                         # MIT
+├── CLAUDE.md                       # Claude Code guide (currently git-ignored)
+└── dev-setup.ps1                   # One-time developer machine setup
 ```
 
 ---
