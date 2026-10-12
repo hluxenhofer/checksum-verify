@@ -290,7 +290,6 @@ checksum-verify/
 ├── SUPPORT.md
 ├── THIRD-PARTY-NOTICES.md          # Licenses of bundled dependencies (shipped with the installer)
 ├── LICENSE                         # MIT
-├── CLAUDE.md                       # Claude Code guide (currently git-ignored)
 └── dev-setup.ps1                   # One-time developer machine setup
 ```
 
