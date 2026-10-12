@@ -113,4 +113,101 @@ public class HashEngineTests
     {
         Assert.True(HashEngine.IsSupported(algorithm));
     }
+
+    [Fact]
+    public async Task Sha3_256_HelloFile_ReturnsKnownHash()
+    {
+        Assert.SkipUnless(HashEngine.IsSupported(HashAlgorithmId.Sha3_256), "SHA3 requires Windows 11 Build 25324+ (or OpenSSL 1.1.1+)");
+        var result = await HashEngine.ComputeAsync(FixturePath("hello.bin"), HashAlgorithmId.Sha3_256, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal("3338be694f50c5f338814986cdf0686453a888b84f424d792af4b9202398f392", result);
+    }
+
+    [Fact]
+    public async Task Sha3_512_HelloFile_ReturnsKnownHash()
+    {
+        Assert.SkipUnless(HashEngine.IsSupported(HashAlgorithmId.Sha3_512), "SHA3 requires Windows 11 Build 25324+ (or OpenSSL 1.1.1+)");
+        var result = await HashEngine.ComputeAsync(FixturePath("hello.bin"), HashAlgorithmId.Sha3_512, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal("75d527c368f2efe848ecf6b073a36767800805e9eef2b1857d5f984f036eb6df891d75f72d9b154518c1cd58835286d1da9a38deba3de98b5a53e5ed78a84976", result);
+    }
+
+    [Fact]
+    public async Task ComputeAsync_ProgressIsThrottledAndEndsAtFileLength()
+    {
+        const int length = 3 * 1024 * 1024 + 123;
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".bin");
+        await File.WriteAllBytesAsync(path, new byte[length], TestContext.Current.CancellationToken);
+        try
+        {
+            var reports = new List<long>();
+            await HashEngine.ComputeAsync(path, HashAlgorithmId.Sha256, new SynchronousProgress(reports.Add), TestContext.Current.CancellationToken);
+            Assert.Equal(length, reports[^1]);
+            // 50 chunks of 64 KB, reported every 16th chunk plus once at the end
+            Assert.InRange(reports.Count, 2, 6);
+        }
+        finally { File.Delete(path); }
+    }
+
+    private sealed class SynchronousProgress(Action<long> report) : IProgress<long>
+    {
+        public void Report(long value) => report(value);
+    }
+
+    [Theory]
+    [InlineData(HashAlgorithmId.Md5, 32)]
+    [InlineData(HashAlgorithmId.Sha1, 40)]
+    [InlineData(HashAlgorithmId.Sha256, 64)]
+    [InlineData(HashAlgorithmId.Sha3_256, 64)]
+    [InlineData(HashAlgorithmId.Blake3, 64)]
+    [InlineData(HashAlgorithmId.Blake2b_256, 64)]
+    [InlineData(HashAlgorithmId.Sha512, 128)]
+    [InlineData(HashAlgorithmId.Sha3_512, 128)]
+    [InlineData(HashAlgorithmId.Blake2b_512, 128)]
+    public void HexLength_MatchesDigestSize(HashAlgorithmId algorithm, int expected)
+    {
+        Assert.Equal(expected, HashEngine.HexLength(algorithm));
+    }
+
+    [Fact]
+    public void CandidatesForHexLength_64_ContainsSupported256BitAlgorithms()
+    {
+        var candidates = HashEngine.CandidatesForHexLength(64);
+        Assert.Contains(HashAlgorithmId.Sha256, candidates);
+        Assert.Contains(HashAlgorithmId.Blake3, candidates);
+        Assert.Contains(HashAlgorithmId.Blake2b_256, candidates);
+        Assert.DoesNotContain(HashAlgorithmId.Sha512, candidates);
+    }
+
+    [Fact]
+    public void CandidatesForHexLength_32_IsOnlyMd5()
+    {
+        Assert.Equal([HashAlgorithmId.Md5], HashEngine.CandidatesForHexLength(32));
+    }
+
+    [Fact]
+    public async Task ComputeAsync_FileOpenForWriting_CanStillBeHashed()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".bin");
+        // Another program (e.g. a download manager) still holds the file open for writing
+        await using var writer = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+        await writer.WriteAsync("hello"u8.ToArray(), TestContext.Current.CancellationToken);
+        await writer.FlushAsync(TestContext.Current.CancellationToken);
+        try
+        {
+            var result = await HashEngine.ComputeAsync(path, HashAlgorithmId.Sha256, cancellationToken: TestContext.Current.CancellationToken);
+            Assert.Equal("2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", result);
+        }
+        finally
+        {
+            writer.Dispose();
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task ComputeAsync_EmptyFile_ReportsProgressZero()
+    {
+        var reports = new List<long>();
+        await HashEngine.ComputeAsync(FixturePath("empty.bin"), HashAlgorithmId.Sha256, new SynchronousProgress(reports.Add), TestContext.Current.CancellationToken);
+        Assert.Equal([0L], reports);
+    }
 }

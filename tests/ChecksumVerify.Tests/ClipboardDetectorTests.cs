@@ -104,4 +104,34 @@ public class ClipboardDetectorTests
     {
         Assert.Equal(expected, ClipboardDetector.StripAlgoPrefix(input));
     }
+
+    [Theory]
+    [InlineData("abc")]
+    [InlineData("2026")]
+    [InlineData("deadbeef")]
+    public void TryDetect_ImplausibleHexLength_ReturnsNull(string input)
+    {
+        Assert.Null(ClipboardDetector.TryDetect(input));
+    }
+
+    [Fact]
+    public void TryDetect_UnprefixedHash_IsNotExplicit()
+    {
+        Assert.False(ClipboardDetector.TryDetect(new string('a', 64))!.IsExplicit);
+    }
+
+    [Fact]
+    public void TryDetect_PrefixedHash_IsExplicit()
+    {
+        Assert.True(ClipboardDetector.TryDetect("blake3:" + new string('a', 64))!.IsExplicit);
+    }
+
+    [Theory]
+    [InlineData(64, HashAlgorithmId.Blake2b_256)]
+    [InlineData(128, HashAlgorithmId.Blake2b_512)]
+    public void TryDetect_Blake2bPrefix_PicksVariantByLength(int length, HashAlgorithmId expected)
+    {
+        var result = ClipboardDetector.TryDetect("blake2b:" + new string('a', length));
+        Assert.Equal(expected, result?.SuggestedAlgorithm);
+    }
 }

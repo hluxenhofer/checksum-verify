@@ -2,7 +2,8 @@ using System.Text.RegularExpressions;
 
 namespace ChecksumVerify.Core;
 
-public sealed record DetectedHash(string Hash, HashAlgorithmId? SuggestedAlgorithm);
+/// <param name="IsExplicit">True when the algorithm came from an "algo:" prefix rather than the hash length.</param>
+public sealed record DetectedHash(string Hash, HashAlgorithmId? SuggestedAlgorithm, bool IsExplicit = false);
 
 public static partial class ClipboardDetector
 {
@@ -73,10 +74,17 @@ public static partial class ClipboardDetector
             var prefix = trimmed[..colonIdx];
             var hex = trimmed[(colonIdx + 1)..].Trim();
             if (PrefixMap.TryGetValue(prefix, out var algoFromPrefix) && IsHexString(hex))
-                return new DetectedHash(hex.ToLowerInvariant(), algoFromPrefix);
+            {
+                // "blake2b:" is 512-bit by default (b2sum); a 64-char hash means the 256-bit variant
+                if (algoFromPrefix == HashAlgorithmId.Blake2b_512 && hex.Length == 64)
+                    algoFromPrefix = HashAlgorithmId.Blake2b_256;
+                return new DetectedHash(hex.ToLowerInvariant(), algoFromPrefix, IsExplicit: true);
+            }
         }
 
-        if (!IsHexString(trimmed)) return null;
+        // Without a prefix, only accept lengths that belong to a supported algorithm,
+        // so "2026" or "deadbeef" on the clipboard is not mistaken for a hash.
+        if (!IsHexString(trimmed) || SuggestAlgorithm(trimmed) is null) return null;
         var hash = trimmed.ToLowerInvariant();
         return new DetectedHash(hash, SuggestAlgorithm(hash));
     }

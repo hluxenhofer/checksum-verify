@@ -81,6 +81,12 @@
                         Click="OnPaste"/>
             </Grid>
 
+            <TextBlock x:Name="AmbiguityNote"
+                       Visibility="Collapsed"
+                       TextWrapping="Wrap"
+                       Style="{StaticResource CaptionTextBlockStyle}"
+                       Opacity="0.7"/>
+
             <Grid x:Name="FilePanel" ColumnSpacing="8" Visibility="Collapsed">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>

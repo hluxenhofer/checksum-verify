@@ -5,6 +5,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Installed app failed to start on machines without the Windows App SDK runtime: the runtime is now bundled (self-contained), and CI verifies it is in the publish output
+- `.b2`/`.blake2`/`.blake2b` hash files were treated as BLAKE2b-256, so normal `b2sum` (512-bit) files always reported a mismatch; the variant is now chosen by hash length
+- SHA3 requirement corrected to Windows 11 24H2+ (was shown as 22H2+)
+- Hash-file problems (no entry for the file, no hash entered, hash length not matching the algorithm) are reported before hashing starts instead of after reading the whole file
+- Algorithm from a hash file is now applied (including `.sha256sum`/`.sha512sum`) instead of using whatever the dropdown showed
+- A sidecar file containing a line for a different file is no longer used as if it were the hash for this file
+- Window is sized to its content at the display DPI instead of using fixed heights, so nothing is clipped at 125–200% scaling or with long messages, and there is no dead space; it stays inside the work area when it grows to show a result
+- Window opens on the monitor under the cursor instead of always the primary one
+- Clipboard auto-fill ignores hex strings that cannot be a hash (e.g. `2026`, `deadbeef`)
+- Auto-detection no longer overrides an algorithm you picked when the hash length still fits it
+- Cancel during hashing now stops the computation and keeps the window open instead of closing it
+- Hash file picker now also lists `.sha1` and `.blake2b`
+
+### Added
+
+- Note listing the candidate algorithms when a pasted hash length is ambiguous (64 or 128 characters)
+- BSD-style hash lines (`sha256sum --tag`: `SHA256 (file) = hash`) and backslash-escaped file names in hash files
+- Tooltip on disabled SHA3 options
+
+### Changed
+
+- Progress is reported about once per MiB instead of once per 64 KB chunk
+- Files are opened with `FileShare.ReadWrite | FileShare.Delete`, so files that another program holds open can still be verified
+
 ## [0.1.0] - 2026-10-11
 
 ### Added

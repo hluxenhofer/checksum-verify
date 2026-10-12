@@ -19,12 +19,13 @@ Requirements: Windows 10 22H2+ or Windows 11, [.NET 10 SDK](https://dotnet.micro
 dotnet build
 dotnet test
 dotnet run --project src/ChecksumVerify -- "C:\path\to\file.zip"
-iscc installer\setup.iss       # optional: build installer
+dotnet publish src/ChecksumVerify/ChecksumVerify.csproj -c Release -r win-x64 --self-contained -o publish/win-x64/
+iscc installer\setup.iss       # optional: build installer (needs the publish output above)
 ```
 
 ## Project Layout
 
-- `src/ChecksumVerify.Core` — UI-free logic: hashing, hash-file parsing, clipboard detection. Keep new logic here so it is testable.
+- `src/ChecksumVerify.Core` — UI-free logic: hashing, hash-file parsing, clipboard detection, algorithm auto-selection and input validation. Keep new logic here (including decisions the window makes) so it is testable.
 - `src/ChecksumVerify` — WinUI 3 popup and startup.
 - `tests/ChecksumVerify.Tests` — unit tests against real algorithm implementations (no mocks, no UI). Fixtures in `tests/ChecksumVerify.Tests/Fixtures/`.
 - `installer/setup.iss` — Inno Setup script.
