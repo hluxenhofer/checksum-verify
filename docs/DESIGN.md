@@ -242,7 +242,10 @@ checksum-verify/
 │   │   ├── HashAlgorithmId.cs     # Enum of supported algorithms
 │   │   ├── HashEngine.cs          # Algorithm dispatch + streaming compute
 │   │   ├── HashFileParser.cs      # GNU + sidecar format parsing
-│   │   └── ClipboardDetector.cs   # Hex string detection + length→algorithm
+│   │   ├── ClipboardDetector.cs   # Hex string detection + length→algorithm
+│   │   ├── AlgorithmSelector.cs   # Dropdown auto-selection rules + ambiguity note
+│   │   ├── VerifyInputResolver.cs # Pre-hash input validation
+│   │   └── HashAlgorithmNames.cs  # Display names
 │   └── ChecksumVerify/
 │       ├── ChecksumVerify.csproj
 │       ├── Program.cs             # Custom Main (unpackaged WinUI 3 startup)
@@ -258,6 +261,8 @@ checksum-verify/
 │       ├── HashEngineTests.cs
 │       ├── HashFileParserTests.cs
 │       ├── ClipboardDetectorTests.cs
+│       ├── AlgorithmSelectorTests.cs
+│       ├── VerifyInputResolverTests.cs
 │       └── Fixtures/              # Small files with known hashes
 ├── installer/
 │   └── setup.iss
@@ -307,7 +312,7 @@ iscc installer\setup.iss
 
 ## 10. Testing Strategy
 
-- **Unit tests** (`ChecksumVerify.Tests`): `HashEngine`, `HashFileParser`, `ClipboardDetector` — no UI; they read small fixture or temp files but need no mocks
+- **Unit tests** (`ChecksumVerify.Tests`): `HashEngine`, `HashFileParser`, `ClipboardDetector`, `AlgorithmSelector`, `VerifyInputResolver` — no UI; they read small fixture or temp files but need no mocks. The window's decisions (auto-selection, validation, error text) are pure Core functions, so only control wiring, DPI sizing and window placement need manual testing
 - **Known-hash fixtures**: small test files with pre-computed hashes committed to `tests/ChecksumVerify.Tests/Fixtures/`. SHA3 tests skip themselves where the OS lacks SHA-3 support
 - **Manual UI tests**: developer runs against real downloaded files before each release
 - **CI**: `dotnet test` on every push; `dotnet build -c Release` as gate for PRs

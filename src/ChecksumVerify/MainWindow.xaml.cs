@@ -18,8 +18,6 @@ public sealed partial class MainWindow : Window
     private const int ResultHeight = 460;
     private const int ResultWithHashHeight = 560;
 
-    private const string Sha3Requirement = "Windows 11 24H2+";
-
     private readonly string _filePath;
     private CancellationTokenSource? _cts;
     private string? _hashFilePath;
@@ -29,20 +27,19 @@ public sealed partial class MainWindow : Window
     private HashAlgorithmId? _userChoice;
     private bool _suppressAlgorithmEvents;
 
-    private static readonly (string Label, HashAlgorithmId Id)[] Algorithms =
+    // Display order in the dropdown
+    private static readonly HashAlgorithmId[] Algorithms =
     [
-        ("SHA-256",     HashAlgorithmId.Sha256),
-        ("SHA-512",     HashAlgorithmId.Sha512),
-        ("SHA3-256",    HashAlgorithmId.Sha3_256),
-        ("SHA3-512",    HashAlgorithmId.Sha3_512),
-        ("BLAKE3",      HashAlgorithmId.Blake3),
-        ("BLAKE2b-256", HashAlgorithmId.Blake2b_256),
-        ("BLAKE2b-512", HashAlgorithmId.Blake2b_512),
-        ("MD5",         HashAlgorithmId.Md5),
-        ("SHA-1",       HashAlgorithmId.Sha1),
+        HashAlgorithmId.Sha256,
+        HashAlgorithmId.Sha512,
+        HashAlgorithmId.Sha3_256,
+        HashAlgorithmId.Sha3_512,
+        HashAlgorithmId.Blake3,
+        HashAlgorithmId.Blake2b_256,
+        HashAlgorithmId.Blake2b_512,
+        HashAlgorithmId.Md5,
+        HashAlgorithmId.Sha1,
     ];
-
-    private readonly record struct VerifyInput(string? Expected, HashAlgorithmId Algorithm, string? Error);
 
     public MainWindow(string filePath)
     {
@@ -55,15 +52,16 @@ public sealed partial class MainWindow : Window
         HashModeRadio.IsChecked = true;
         FileNameText.Text = Path.GetFileName(filePath);
 
-        foreach (var (label, id) in Algorithms)
+        foreach (var id in Algorithms)
         {
+            var label = id.DisplayName();
             var item = new ComboBoxItem { Tag = id };
             if (!HashEngine.IsSupported(id))
             {
-                item.Content = $"{label} (requires {Sha3Requirement})";
+                item.Content = $"{label} (requires {HashAlgorithmNames.Sha3Requirement})";
                 item.IsEnabled = false;
                 ToolTipService.SetToolTip(item,
-                    $"{label} needs {Sha3Requirement}: older Windows versions lack SHA-3 in the system cryptography library.");
+                    $"{label} needs {HashAlgorithmNames.Sha3Requirement}: older Windows versions lack SHA-3 in the system cryptography library.");
             }
             else
             {
@@ -147,23 +145,10 @@ public sealed partial class MainWindow : Window
         AutoSelectAlgorithm(detected);
     }
 
-    // Auto-detection by length only decides when it has to: an algorithm the user picked
-    // (or that already fits the hash length) is kept, because 64 hex chars are ambiguous.
     private void AutoSelectAlgorithm(DetectedHash detected)
     {
-        if (detected.SuggestedAlgorithm is not { } suggested) return;
-
-        if (detected.IsExplicit)
-        {
-            SelectAlgorithm(suggested);
-            return;
-        }
-
-        var length = detected.Hash.Length;
-        if (_userChoice is { } choice && HashEngine.HexLength(choice) == length)
-            SelectAlgorithm(choice);
-        else if (HashEngine.HexLength(SelectedAlgorithm) != length)
-            SelectAlgorithm(suggested);
+        if (AlgorithmSelector.Choose(detected, SelectedAlgorithm, _userChoice) is { } id)
+            SelectAlgorithm(id);
     }
 
     private bool SelectAlgorithm(HashAlgorithmId id)
@@ -185,23 +170,13 @@ public sealed partial class MainWindow : Window
     private HashAlgorithmId SelectedAlgorithm =>
         AlgorithmCombo.SelectedItem is ComboBoxItem { Tag: HashAlgorithmId id } ? id : HashAlgorithmId.Sha256;
 
-    private static string LabelOf(HashAlgorithmId id) => Algorithms.First(a => a.Id == id).Label;
-
     private void UpdateAmbiguityNote()
     {
-        AmbiguityNote.Visibility = Visibility.Collapsed;
-        if (HashModeRadio.IsChecked != true) return;
-
-        var detected = ClipboardDetector.TryDetect(HashInput.Text);
-        if (detected is null or { IsExplicit: true }) return;
-
-        var candidates = HashEngine.CandidatesForHexLength(detected.Hash.Length);
-        if (candidates.Count < 2) return;
-
-        AmbiguityNote.Text =
-            $"A {detected.Hash.Length}-character hash could be {string.Join(", ", candidates.Select(LabelOf))}. " +
-            $"Selected: {LabelOf(SelectedAlgorithm)} — change the algorithm if the hash comes from another tool.";
-        AmbiguityNote.Visibility = Visibility.Visible;
+        var note = HashModeRadio.IsChecked == true
+            ? AlgorithmSelector.DescribeAmbiguity(ClipboardDetector.TryDetect(HashInput.Text), SelectedAlgorithm)
+            : null;
+        AmbiguityNote.Text = note ?? string.Empty;
+        AmbiguityNote.Visibility = note is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
     // ── Input handlers ────────────────────────────────────────────────────────
@@ -275,52 +250,17 @@ public sealed partial class MainWindow : Window
 
     // ── Verify ────────────────────────────────────────────────────────────────
 
-    // Everything that can be wrong with the inputs is checked here, *before* the (possibly
-    // multi-GB) file is read, so the user hears about it immediately.
+    // Everything that can be wrong with the inputs is checked before the (possibly multi-GB)
+    // file is read, so the user hears about it immediately.
     private VerifyInput ResolveInput()
     {
-        var algorithm = SelectedAlgorithm;
-        string expected;
+        var input = HashModeRadio.IsChecked == true
+            ? VerifyInputResolver.FromHash(HashInput.Text, SelectedAlgorithm)
+            : VerifyInputResolver.FromHashFile(_hashFilePath, Path.GetFileName(_filePath), SelectedAlgorithm);
 
-        if (HashModeRadio.IsChecked == true)
-        {
-            expected = ClipboardDetector.StripAlgoPrefix(HashInput.Text);
-            if (expected.Length == 0)
-                return new(null, algorithm, "No hash provided. Enter or paste an expected hash first.");
-            if (!ClipboardDetector.IsHexString(expected))
-                return new(null, algorithm, "The expected hash must contain only hexadecimal characters (0-9, a-f).");
-        }
-        else
-        {
-            if (_hashFilePath is null)
-                return new(null, algorithm, "No hash file selected. Browse for a hash file first.");
-
-            var fileName = Path.GetFileName(_filePath);
-            var parsed = HashFileParser.TryParse(_hashFilePath, fileName);
-            if (parsed is null)
-                return new(null, algorithm, $"No entry found for {fileName} in the hash file.");
-
-            expected = parsed.Hash;
-            if (parsed.Algorithm is { } fromFile)
-            {
-                if (!HashEngine.IsSupported(fromFile))
-                    return new(null, fromFile, $"{LabelOf(fromFile)} needs {Sha3Requirement}.");
-
-                // A tag/extension is authoritative; a guess from the length only wins if the current choice cannot fit
-                if (parsed.IsAlgorithmCertain || HashEngine.HexLength(algorithm) != expected.Length)
-                {
-                    algorithm = fromFile;
-                    SelectAlgorithm(fromFile);
-                }
-            }
-        }
-
-        var needed = HashEngine.HexLength(algorithm);
-        if (expected.Length != needed)
-            return new(null, algorithm,
-                $"The expected hash has {expected.Length} characters, but {LabelOf(algorithm)} produces {needed}. Check the selected algorithm.");
-
-        return new(expected, algorithm, null);
+        // Show the algorithm that will actually be used (a hash file may dictate it)
+        SelectAlgorithm(input.Algorithm);
+        return input;
     }
 
     private async void OnVerify(object sender, RoutedEventArgs e)

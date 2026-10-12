@@ -182,4 +182,32 @@ public class HashEngineTests
     {
         Assert.Equal([HashAlgorithmId.Md5], HashEngine.CandidatesForHexLength(32));
     }
+
+    [Fact]
+    public async Task ComputeAsync_FileOpenForWriting_CanStillBeHashed()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".bin");
+        // Another program (e.g. a download manager) still holds the file open for writing
+        await using var writer = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+        await writer.WriteAsync("hello"u8.ToArray(), TestContext.Current.CancellationToken);
+        await writer.FlushAsync(TestContext.Current.CancellationToken);
+        try
+        {
+            var result = await HashEngine.ComputeAsync(path, HashAlgorithmId.Sha256, cancellationToken: TestContext.Current.CancellationToken);
+            Assert.Equal("2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", result);
+        }
+        finally
+        {
+            writer.Dispose();
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task ComputeAsync_EmptyFile_ReportsProgressZero()
+    {
+        var reports = new List<long>();
+        await HashEngine.ComputeAsync(FixturePath("empty.bin"), HashAlgorithmId.Sha256, new SynchronousProgress(reports.Add), TestContext.Current.CancellationToken);
+        Assert.Equal([0L], reports);
+    }
 }
